@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مين برا السالفة؟ (أونلاين)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --primary: #8b5cf6;
+            --secondary: #ec4899;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #22d3ee;
+            --danger: #ef4444;
+            --success: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--accent);
+            margin-bottom: 30px;
+            text-shadow: 0 0 20px rgba(34, 211, 238, 0.3);
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 30px 20px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border-radius: 50px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 10px;
+            transition: 0.2s;
+            font-family: inherit;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid #334155;
+            background: #0f172a;
+            color: white;
+            margin-bottom: 15px;
+            font-family: inherit;
+            text-align: center;
+            font-size: 1.1rem;
+        }
+
+        input:focus {
+            border-color: var(--accent);
+            outline: none;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .player-list {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+        }
+
+        .player-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .player-item.me {
+            border: 1px solid var(--accent);
+        }
+
+        .host-badge {
+            background: var(--accent);
+            color: black;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+        }
+
+        .role-card {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1));
+            border: 2px solid var(--primary);
+            padding: 30px;
+            border-radius: 20px;
+            margin: 20px 0;
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .cat-btn {
+            background: rgba(0, 0, 0, 0.2);
+            border: 2px solid transparent;
+            padding: 10px;
+            border-radius: 12px;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .cat-btn.selected {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(34, 211, 238, 0.1);
+        }
+
+        /* Host Controls */
+        .host-only {
+            display: none;
+        }
+
+        body.is-host .host-only {
+            display: block;
+        }
+
+        .timer-display {
+            font-size: 3rem;
+            font-weight: 900;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <!-- Login Screen -->
+        <div id="login-screen" class="screen active">
+            <h1>مين برا السالفة؟</h1>
+            <div class="card">
+                <input type="text" id="username" placeholder="اكتب اسمك" maxlength="10">
+                <button class="btn" onclick="createRoom()">إنشاء غرفة جديدة</button>
+                <div style="display: flex; gap: 10px; align-items: center; margin: 15px 0;">
+                    <hr style="flex: 1; border-color: #334155;"> <span style="color:#64748b">أو</span>
+                    <hr style="flex: 1; border-color: #334155;">
+                </div>
+                <input type="text" id="room-code-input" placeholder="رمز الغرفة (مثال: ABCD)"
+                    style="text-transform: uppercase;">
+                <button class="btn btn-outline" onclick="joinRoom()">دخول غرفة</button>
+            </div>
+        </div>
+
+        <!-- Lobby Screen -->
+        <div id="lobby-screen" class="screen">
+            <h3>رمز الغرفة: <span id="display-room-code" style="color: var(--accent); letter-spacing: 2px;"></span></h3>
+
+            <div class="card">
+                <h4>اللاعبين المتواجدين</h4>
+                <ul class="player-list" id="lobby-player-list"></ul>
+
+                <div class="host-only">
+                    <hr style="border-color: rgba(255,255,255,0.1); margin: 20px 0;">
+                    <h4>إعدادات اللعبة</h4>
+
+                    <label>نوع السالفة</label>
+                    <div class="category-grid" id="category-options">
+                        <!-- filled by JS -->
+                    </div>
+
+                    <!-- Custom Words Area -->
+                    <div id="custom-words-area" style="display:none; margin-bottom: 20px;">
+                        <label>الكلمات المخصصة (افصل بفاصلة)</label>
+                        <textarea id="custom-words-input"
+                            style="width: 100%; height: 80px; background: rgba(0,0,0,0.3); border: 1px solid #334155; color: white; border-radius: 8px; padding: 10px; font-family: inherit;"
+                            placeholder="مثال: محمد, احمد, السفر, السيارة..."></textarea>
+                        <button class="btn btn-outline" style="font-size: 0.9rem; padding: 5px;"
+                            onclick="saveCustomWords()">حفظ الكلمات</button>
+                        <span id="custom-status" style="font-size: 0.8rem; color: var(--success); display: none;">تم
+                            الحفظ!</span>
+                    </div>
+
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 12px;">
+                        <span>عدد "برا السالفة"</span>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button class="btn" style="width: 40px; padding: 5px; margin:0;"
+                                onclick="adjustSpies(-1)">-</button>
+                            <span id="spy-count-display">1</span>
+                            <button class="btn" style="width: 40px; padding: 5px; margin:0;"
+                                onclick="adjustSpies(1)">+</button>
+                        </div>
+                    </div>
+                    <br>
+                    <button class="btn" onclick="startGame()">بدء اللعبة</button>
+                </div>
+                <div id="wait-msg" style="color: var(--text-muted);">ننتظر المضيف يبدأ اللعبة...</div>
+            </div>
+        </div>
+
+        <!-- Game Role Screen -->
+        <div id="role-screen" class="screen">
+            <div class="card">
+                <h2>دورك في اللعبة</h2>
+                <div class="role-card">
+                    <p style="color: var(--text-muted); margin-bottom: 10px;">انتبه أحد يشوف جوالك!</p>
+                    <h1 id="my-secret-word">...</h1>
+                </div>
+                <p>أول لاعب يسأل هو: <span id="first-player-name"
+                        style="color: var(--accent); font-weight: bold;"></span></p>
+                <br>
+                <button class="btn host-only" onclick="startVoting()">بدء التصويت</button>
+            </div>
+
+            <!-- Timer Section -->
+            <div class="card">
+                <div class="timer-display" id="game-timer">00:00</div>
+                <button class="btn btn-outline host-only" id="timer-btn" onclick="toggleTimer()">تشغيل الوقت</button>
+            </div>
+        </div>
+
+        <!-- Voting Screen -->
+        <div id="voting-screen" class="screen">
+            <h1>وقت التصويت!</h1>
+            <p style="color: var(--text-muted); margin-bottom: 20px;">مين اللي برا السالفة؟</p>
+
+            <div class="card">
+                <div id="voting-list" style="display: grid; gap: 10px;"></div>
+                <p id="voting-status" style="margin-top: 15px; color: var(--accent);"></p>
+                <button class="btn host-only" style="margin-top:20px; background: var(--danger);"
+                    onclick="forceReveal()">إنهاء وكشف النتيجة</button>
+            </div>
+        </div>
+
+        <!-- Results Screen -->
+        <div id="result-screen" class="screen">
+            <h1 id="winner-title">انتهت اللعبة!</h1>
+            <div class="card">
+                <div id="winner-banner"
+                    style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+                    <h2 id="winner-text" style="color: var(--success); margin: 0;"></h2>
+                </div>
+
+                <p>السالفة كانت:</p>
+                <h2 id="result-word" style="color: var(--accent);"></h2>
+                <hr style="border-color: rgba(255,255,255,0.1);">
+
+                <h3>الجواسيس هما:</h3>
+                <div id="spies-list" style="margin-bottom: 20px;"></div>
+
+                <button class="btn host-only" onclick="returnToLobby()">عودة للوبي</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const socket = io();
+
+        // --- Sound Effects ---
+        // Using external URLs to ensure they work without local file issues
+        const sounds = {
+            join: new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3'),
+            start: new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'),
+            vote: new Audio('https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3'),
+            win: new Audio('https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3'),
+            lose: new Audio('https://assets.mixkit.co/active_storage/sfx/203/203-preview.mp3')
+        };
+
+        function playSound(type) {
+            if (sounds[type]) {
+                sounds[type].currentTime = 0;
+                // Interactions required for audio, we catch errors silently
+                sounds[type].play().catch(e => { });
+            }
+        }
+
+        // State
+        let myName = '';
+        let currentRoom = '';
+        let isHost = false;
+        let timerInterval = null;
+        let timerSeconds = 0;
+        let hasVoted = false;
+
+        // Static Data
+        const categories = [
+            { id: 'general', name: 'عام' },
+            { id: 'animals', name: 'حيوانات' },
+            { id: 'food', name: 'أكل' },
+            { id: 'objects', name: 'أشياء' },
+            { id: 'tech', name: 'تقنية' },
+            { id: 'custom', name: 'مخصص ✨' }
+        ];
+
+        // --- Login ---
+        function createRoom() {
+            const name = document.getElementById('username').value.trim();
+            if (!name) return alert('اكتب اسمك أول!');
+            myName = name;
+            socket.emit('create_room', { playerName: name });
+        }
+
+        function joinRoom() {
+            const name = document.getElementById('username').value.trim();
+            const code = document.getElementById('room-code-input').value.trim().toUpperCase();
+            if (!name) return alert('اكتب اسمك أول!');
+            if (!code) return alert('اكتب رمز الغرفة!');
+            myName = name;
+            socket.emit('join_room', { roomCode: code, playerName: name });
+        }
+
+        // --- Socket Events ---
+        socket.on('error_message', (msg) => {
+            alert(msg);
+            playSound('lose');
+        });
+
+        socket.on('room_joined', (data) => {
+            currentRoom = data.roomCode;
+            isHost = data.isHost;
+            document.getElementById('display-room-code').innerText = data.roomCode;
+
+            playSound('join');
+
+            if (isHost) {
+                document.body.classList.add('is-host');
+                document.getElementById('wait-msg').style.display = 'none';
+                renderCategoryOptions();
+            } else {
+                document.body.classList.remove('is-host');
+                document.getElementById('wait-msg').style.display = 'block';
+            }
+
+            switchScreen('lobby-screen');
+        });
+
+        socket.on('update_players', (players) => {
+            const list = document.getElementById('lobby-player-list');
+            list.innerHTML = players.map(p => `
+            <li class="player-item ${p.id === socket.id ? 'me' : ''}">
+                <span>${p.name} ${Object.values(p).includes(true) ? '<span class="host-badge">مضيف</span>' : ''}</span>
+            </li>
+        `).join('');
+        });
+
+        socket.on('update_settings', (settings) => {
+            if (isHost) {
+                document.querySelectorAll('.cat-btn').forEach(b => {
+                    b.classList.toggle('selected', b.dataset.id === settings.category);
+                });
+                document.getElementById('spy-count-display').innerText = settings.spiesCount;
+
+                // Show custom input if custom cat
+                const customArea = document.getElementById('custom-words-area');
+                if (settings.category === 'custom') {
+                    customArea.style.display = 'block';
+                } else {
+                    customArea.style.display = 'none';
+                }
+            }
+        });
+
+        socket.on('you_are_host', () => {
+            isHost = true;
+            document.body.classList.add('is-host');
+            document.getElementById('wait-msg').style.display = 'none';
+            renderCategoryOptions();
+        });
+
+        socket.on('game_start', (data) => {
+            playSound('start');
+            switchScreen('role-screen');
+            const wordEl = document.getElementById('my-secret-word');
+            wordEl.innerText = data.word;
+            if (data.role === 'spy') {
+                wordEl.style.color = 'var(--danger)';
+            } else {
+                wordEl.style.color = 'var(--success)';
+            }
+            document.getElementById('first-player-name').innerText = data.firstPlayer;
+
+            // Reset timer
+            timerSeconds = 0;
+            updateTimerDisplay();
+        });
+
+        socket.on('timer_update', (data) => {
+            if (data.action === 'start') {
+                startLocalTimer(data.value);
+            } else if (data.action === 'stop') {
+                stopLocalTimer(data.value);
+            }
+        });
+
+        socket.on('voting_phase', (data) => {
+            playSound('vote');
+            switchScreen('voting-screen');
+            hasVoted = false;
+            document.getElementById('voting-status').innerText = '';
+            const list = document.getElementById('voting-list');
+            list.innerHTML = data.players.map(p => `
+            <button class="btn btn-outline" onclick="submitVote('${p.id}', this)">
+                ${p.name}
+            </button>
+        `).join('');
+        });
+
+        socket.on('vote_update', (data) => {
+            document.getElementById('voting-status').innerText = `تم التصويت: ${data.count} / ${data.total}`;
+        });
+
+        socket.on('game_over', (data) => {
+            switchScreen('result-screen');
+
+            // Winner Logic
+            const banner = document.getElementById('winner-banner');
+            const text = document.getElementById('winner-text');
+
+            if (data.winner === 'civilians') {
+                text.innerText = 'فاز اللي "داخل السالفة"! 🥳';
+                banner.style.background = 'rgba(16, 185, 129, 0.2)';
+                banner.style.border = '1px solid var(--success)';
+                playSound('win');
+            } else {
+                text.innerText = 'فازوا اللي "برا السالفة"! 🕵️‍♂️';
+                banner.style.background = 'rgba(239, 68, 68, 0.2)';
+                banner.style.border = '1px solid var(--danger)';
+                playSound('lose');
+            }
+
+            document.getElementById('result-word').innerText = data.secretWord;
+
+            document.getElementById('spies-list').innerHTML = data.spies.map(s => `
+            <div style="background: rgba(239,68,68,0.2); padding: 5px 10px; border-radius: 8px; margin: 5px 0;">${s}</div>
+        `).join('');
+
+            stopLocalTimer(0);
+        });
+
+        socket.on('return_to_lobby', () => {
+            switchScreen('lobby-screen');
+        });
+
+        // --- Host Logic ---
+
+        function renderCategoryOptions() {
+            const container = document.getElementById('category-options');
+            container.innerHTML = categories.map(cat => `
+            <button class="cat-btn" data-id="${cat.id}" onclick="setCategory('${cat.id}')">
+                ${cat.name}
+            </button>
+        `).join('');
+        }
+
+        function setCategory(id) {
+            socket.emit('update_settings', { roomCode: currentRoom, category: id });
+        }
+
+        function saveCustomWords() {
+            const input = document.getElementById('custom-words-input').value;
+            const words = input.split(',').map(s => s.trim()).filter(s => s.length > 0);
+            if (words.length < 1) return alert('اكتب كلمة وحدة على الأقل');
+
+            socket.emit('update_settings', { roomCode: currentRoom, customWords: words });
+
+            const status = document.getElementById('custom-status');
+            status.style.display = 'inline';
+            setTimeout(() => status.style.display = 'none', 2000);
+        }
+
+        function adjustSpies(delta) {
+            let current = parseInt(document.getElementById('spy-count-display').innerText);
+            let valid = current + delta;
+            if (valid < 1) valid = 1;
+            socket.emit('update_settings', { roomCode: currentRoom, spiesCount: valid });
+        }
+
+        function startGame() {
+            socket.emit('start_game', { roomCode: currentRoom });
+        }
+
+        function startVoting() {
+            socket.emit('start_voting', { roomCode: currentRoom });
+        }
+
+        function forceReveal() {
+            socket.emit('force_reveal', { roomCode: currentRoom });
+        }
+
+        function returnToLobby() {
+            socket.emit('reset_lobby', { roomCode: currentRoom });
+        }
+
+        // --- Voting Logic ---
+        function submitVote(suspectId, btnElement) {
+            if (hasVoted) return;
+            hasVoted = true;
+
+            // Visual feedback
+            btnElement.style.background = 'var(--primary)';
+            btnElement.style.color = 'white';
+            // Disable all buttons
+            const createBtns = document.getElementById('voting-list').querySelectorAll('button');
+            createBtns.forEach(b => b.disabled = true);
+
+            socket.emit('submit_vote', { roomCode: currentRoom, suspectId });
+        }
+
+        // --- Timer Logic ---
+
+        function toggleTimer() {
+            if (timerInterval) {
+                socket.emit('timer_action', { roomCode: currentRoom, action: 'stop' });
+            } else {
+                socket.emit('timer_action', { roomCode: currentRoom, action: 'start' });
+            }
+        }
+
+        function startLocalTimer(startVal) {
+            if (timerInterval) clearInterval(timerInterval);
+            timerSeconds = startVal;
+            updateTimerDisplay();
+
+            timerInterval = setInterval(() => {
+                timerSeconds++;
+                updateTimerDisplay();
+            }, 1000);
+
+            if (isHost) {
+                const btn = document.getElementById('timer-btn');
+                if (btn) {
+                    btn.innerText = 'إيقاف';
+                    btn.classList.remove('btn-outline');
+                    btn.style.background = 'rgba(255,255,255,0.1)';
+                }
+            }
+        }
+
+        function stopLocalTimer(val) {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = null;
+            timerSeconds = val;
+            updateTimerDisplay();
+
+            if (isHost) {
+                const btn = document.getElementById('timer-btn');
+                if (btn) {
+                    btn.innerText = 'تشغيل';
+                    btn.classList.add('btn-outline');
+                    btn.style.background = 'transparent';
+                }
+            }
+        }
+
+        function updateTimerDisplay() {
+            const m = Math.floor(timerSeconds / 60).toString().padStart(2, '0');
+            const s = (timerSeconds % 60).toString().padStart(2, '0');
+            const el = document.getElementById('game-timer');
+            if (el) el.innerText = `${m}:${s}`;
+        }
+
+
+        // --- Utils ---
+        function switchScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+    </script>
+</body>
+
+</html>
