@@ -148,29 +148,70 @@ io.on('connection', (socket) => {
 
         // 4. Send Individual Roles
         room.gameStarted = true;
+        room.timerSeconds = 0;
+        room.startTime = Date.now();
+
+        // --- Turn System Init ---
+        room.turnPlayerIndex = -1;
+        startTurnCycle(roomCode);
+
+        // Notify Players
         room.players.forEach(p => {
             const secret = p.role === 'spy' ? 'أنت برا السالفة!' : word;
             io.to(p.id).emit('game_start', {
                 role: p.role,
                 word: secret,
-                firstPlayer: firstPlayerName
+                firstPlayer: room.players[0].name
             });
         });
+
+        // --- Global Timer (General) ---
+        if (room.timerInterval) clearInterval(room.timerInterval);
+        room.timerInterval = setInterval(() => {
+            room.timerSeconds++;
+            io.to(roomCode).emit('timer_update', { action: 'tick', value: room.timerSeconds });
+        }, 1000);
     });
+
+    function startTurnCycle(roomCode) {
+        const room = rooms[roomCode];
+        if (!room) return;
+
+        function nextTurn() {
+            if (!room.gameStarted) return;
+
+            room.turnPlayerIndex = (room.turnPlayerIndex + 1) % room.players.length;
+            const currentPlayer = room.players[room.turnPlayerIndex];
+
+            // Emit turn info
+            io.to(roomCode).emit('turn_change', {
+                playerId: currentPlayer.id,
+                playerName: currentPlayer.name,
+                duration: 20 // 20 seconds per turn
+            });
+
+            // Set timeout for next turn
+            if (room.turnTimeout) clearTimeout(room.turnTimeout);
+            room.turnTimeout = setTimeout(nextTurn, 20000); // 20s
+        }
+
+        nextTurn(); // Start first turn
+    }
 
     // --- Game Phase Events ---
 
     socket.on('timer_action', ({ roomCode, action }) => {
         // action: 'start', 'stop', 'reset'
-        const room = rooms[roomCode];
-        if (!room) return;
-
-        io.to(roomCode).emit('timer_update', { action, value: room.timerSeconds });
+        // For simplicity, we just ignore manual timer actions for now if we use auto-timer,
+        // OR we can pause both. Let's keep it simple: global timer runs always.
     });
 
     socket.on('start_voting', ({ roomCode }) => {
         const room = rooms[roomCode];
         if (!room || room.hostId !== socket.id) return;
+
+        // Stop turns
+        if (room.turnTimeout) clearTimeout(room.turnTimeout);
 
         room.votes = {};
         io.to(roomCode).emit('voting_phase', { players: room.players.map(p => ({ id: p.id, name: p.name })) });
